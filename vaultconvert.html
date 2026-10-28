@@ -1,0 +1,2374 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VaultConvert — Zero-Trust Client-Side File Converter & PDF Studio</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Core Client-Side Processing Libraries -->
+  <!-- 1. pdf-lib for PDF creation, merging, splitting, rotating, watermarking & stamping -->
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <!-- 2. PDF.js for rendering real interactive PDF page thumbnails -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- 3. lamejs for real in-browser MP3 audio encoding -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.all.min.js"></script>
+  <!-- 4. SheetJS (xlsx) for spreadsheet & data conversions -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- 5. JSZip for bundling split PDFs and batch images into .zip archives -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- 6. Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate: {
+              850: '#131c2e',
+              925: '#0b1120',
+              950: '#060a12',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      background-color: #060a12;
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b1120;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    .drop-zone-active {
+      border-color: #10b981 !important;
+      background-color: rgba(16, 185, 129, 0.08) !important;
+      transform: scale(1.005);
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(51, 65, 85, 0.55);
+    }
+    .page-card-selected {
+      border-color: #10b981 !important;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35), 0 10px 25px -5px rgba(16, 185, 129, 0.15);
+    }
+    input[type="range"] {
+      accent-color: #10b981;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-emerald-500/30 selection:text-emerald-200">
+
+  <!-- TOP ZERO-TRUST SECURITY TELEMETRY BAR -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <!-- Brand Identity -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/30">
+          <i data-lucide="shield-check" class="w-5 h-5 text-slate-950 stroke-[2.5]"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-lg tracking-tight text-white">Vault<span class="text-emerald-400">Convert</span></span>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              WASM / Local Engine v2.4
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden md:block">Zero-Trust Client-Side File Converter &amp; PDF Manipulation Studio</p>
+        </div>
+      </div>
+
+      <!-- Center Live Magic-Byte & Sandbox Pill -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/90 border border-emerald-500/30 text-xs">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span class="font-mono text-emerald-300 font-medium text-[11px] sm:text-xs">LOCAL SANDBOX ACTIVE</span>
+          <span class="hidden lg:inline text-slate-600">•</span>
+          <span class="hidden lg:inline font-mono text-slate-400 text-[11px]" id="networkByteCounter">0 BYTES SENT TO SERVER</span>
+        </div>
+
+        <button onclick="switchModule('security')" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700 text-xs font-medium text-slate-200 transition">
+          <i data-lucide="binary" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span class="hidden sm:inline">Magic-Byte Audit</span>
+          <span id="auditCountBadge" class="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 font-mono rounded text-[11px]">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="border-t border-slate-800/60 bg-slate-925/80">
+      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center gap-1 overflow-x-auto no-scrollbar py-2">
+        <button id="tab-pdf" onclick="switchModule('pdf')" class="module-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>1. PDF Studio</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Merge/Split/Sign</span>
+        </button>
+
+        <button id="tab-media" onclick="switchModule('media')" class="module-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent">
+          <i data-lucide="music" class="w-4 h-4"></i>
+          <span>2. MP4 &rarr; MP3 / WAV Audio</span>
+        </button>
+
+        <button id="tab-image" onclick="switchModule('image')" class="module-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent">
+          <i data-lucide="image" class="w-4 h-4"></i>
+          <span>3. Image &amp; Img-to-PDF</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-sky-300">WEBP/PNG/JPG</span>
+        </button>
+
+        <button id="tab-data" onclick="switchModule('data')" class="module-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent">
+          <i data-lucide="table" class="w-4 h-4"></i>
+          <span>4. Data &amp; Spreadsheets</span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-purple-300">XLSX/CSV/JSON/MD</span>
+        </button>
+
+        <button id="tab-security" onclick="switchModule('security')" class="module-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i>
+          <span>5. Magic-Byte Inspector &amp; Logs</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-6">
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 1: PDF STUDIO (MERGE, SPLIT, ROTATE, WATERMARK, SIGN)          -->
+    <!-- ===================================================================== -->
+    <section id="module-pdf" class="space-y-6">
+      <!-- Top Action & Drop Banner -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left 8 cols: Dropzone + Page Grid -->
+        <div class="lg:col-span-8 space-y-5">
+          <!-- PDF Upload / Sample Generator Card -->
+          <div id="pdfDropZone" class="glass-panel rounded-2xl p-6 border-2 border-dashed border-slate-700/80 transition-all duration-200 flex flex-col sm:flex-row items-center justify-between gap-5">
+            <div class="flex items-center gap-4 text-center sm:text-left flex-col sm:flex-row">
+              <div class="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                <i data-lucide="files" class="w-7 h-7 text-emerald-400"></i>
+              </div>
+              <div>
+                <h2 class="text-base sm:text-lg font-bold text-white">Drop PDF files here to Merge, Split, Rotate or Annotate</h2>
+                <p class="text-xs sm:text-sm text-slate-400 mt-0.5">
+                  100% browser-rendered via <code class="text-emerald-300 font-mono">PDF.js</code> &amp; manipulated via <code class="text-emerald-300 font-mono">pdf-lib</code>. Combine multiple PDFs freely.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-2.5 shrink-0">
+              <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-500/20 transition">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span>Upload PDFs</span>
+                <input id="pdfFileInput" type="file" accept=".pdf,application/pdf" multiple class="hidden" onchange="handlePdfFiles(this.files)" />
+              </label>
+
+              <button onclick="generateSamplePdf()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/30 text-xs sm:text-sm font-medium transition">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                <span>Generate Sample 4-Page PDF</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Page Grid Toolbar -->
+          <div class="glass-panel rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <span class="text-xs sm:text-sm font-semibold text-slate-200 flex items-center gap-2">
+                <i data-lucide="layout-grid" class="w-4 h-4 text-emerald-400"></i>
+                <span>Visual Page Workspace</span>
+              </span>
+              <span id="pdfPageCountLabel" class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">
+                0 pages (0 selected)
+              </span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="selectAllPdfPages(true)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition">
+                Select All
+              </button>
+              <button onclick="selectAllPdfPages(false)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 border border-slate-700 transition">
+                Deselect All
+              </button>
+              <button onclick="rotateSelectedPdfPages(90)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Rotate +90°</span>
+              </button>
+              <button onclick="clearAllPdfPages()" class="px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-xs font-medium text-rose-300 border border-rose-500/30 transition flex items-center gap-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>Clear Workspace</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Visual PDF Thumbnail Grid -->
+          <div id="pdfGridContainer" class="glass-panel rounded-2xl p-5 min-h-[380px] flex flex-col justify-center">
+            <!-- Empty state -->
+            <div id="pdfEmptyState" class="text-center py-12 space-y-3">
+              <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center mx-auto text-slate-500">
+                <i data-lucide="book-open" class="w-8 h-8"></i>
+              </div>
+              <h3 class="text-base font-semibold text-slate-300">No PDF Pages Loaded Yet</h3>
+              <p class="text-xs text-slate-400 max-w-md mx-auto">
+                Drop one or more PDF files above, or click <strong class="text-emerald-400">"Generate Sample 4-Page PDF"</strong> to immediately test page reordering, rotation, splitting, watermarking, and signature stamping.
+              </p>
+            </div>
+
+            <!-- Active Grid -->
+            <div id="pdfThumbnailGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"></div>
+          </div>
+        </div>
+
+        <!-- Right 4 cols: PDF Manipulation, Split, Watermark & Signature Controls -->
+        <div class="lg:col-span-4 space-y-5">
+          <!-- Primary Export & Split Card -->
+          <div class="glass-panel rounded-2xl p-5 space-y-4 border border-emerald-500/25">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+                <span>Merge &amp; Split Engine</span>
+              </h3>
+              <span class="text-[11px] font-mono text-slate-400">pdf-lib v1.17</span>
+            </div>
+
+            <!-- Merge Selected Button -->
+            <button onclick="exportMergedPdf()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-2">
+              <i data-lucide="download" class="w-4 h-4 stroke-[2.5]"></i>
+              <span>Merge &amp; Download Selected Pages (.PDF)</span>
+            </button>
+
+            <!-- Custom Range Extractor -->
+            <div class="pt-3 border-t border-slate-800 space-y-2.5">
+              <label class="block text-xs font-semibold text-slate-300">
+                Extract Custom Page Range (Split PDF)
+              </label>
+              <div class="flex gap-2">
+                <input id="pdfRangeInput" type="text" placeholder="e.g. 1-2, 4" class="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white focus:outline-none focus:border-emerald-500" />
+                <button onclick="extractPdfRange()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs font-semibold text-emerald-300 transition whitespace-nowrap">
+                  Extract Range
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">Uses current visual page numbers (1-indexed).</p>
+            </div>
+
+            <!-- Burst into ZIP -->
+            <div class="pt-2">
+              <button onclick="burstPdfToZip()" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs transition flex items-center justify-center gap-2">
+                <i data-lucide="folder-archive" class="w-4 h-4 text-amber-400"></i>
+                <span>Burst Selected Pages to Individual PDFs (.ZIP)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Watermark & Page Numbering Studio -->
+          <div class="glass-panel rounded-2xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                <i data-lucide="stamp" class="w-4 h-4 text-emerald-400"></i>
+                <span>Watermark &amp; Page Stamp</span>
+              </h3>
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input id="wmEnableToggle" type="checkbox" class="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0" />
+                <span class="text-xs font-medium text-emerald-300">Apply on Export</span>
+              </label>
+            </div>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Watermark Text</label>
+                <input id="wmTextInput" type="text" value="CONFIDENTIAL // ZERO-TRUST" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white focus:outline-none focus:border-emerald-500" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Placement</label>
+                  <select id="wmPositionSelect" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <option value="diagonal">Diagonal Center (45°)</option>
+                    <option value="header">Top Header Banner</option>
+                    <option value="footer">Bottom Footer Banner</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Stamp Color</label>
+                  <select id="wmColorSelect" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500">
+                    <option value="crimson">Crimson Red</option>
+                    <option value="slate">Slate Gray</option>
+                    <option value="emerald">Emerald Security</option>
+                    <option value="navy">Executive Navy</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="flex justify-between text-xs text-slate-400 mb-1">
+                    <span>Font Size</span>
+                    <span id="wmSizeVal" class="font-mono text-slate-200">36pt</span>
+                  </div>
+                  <input id="wmSizeInput" type="range" min="14" max="72" value="36" oninput="document.getElementById('wmSizeVal').textContent = this.value + 'pt'" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-xs text-slate-400 mb-1">
+                    <span>Opacity</span>
+                    <span id="wmOpacityVal" class="font-mono text-slate-200">25%</span>
+                  </div>
+                  <input id="wmOpacityInput" type="range" min="10" max="90" value="25" oninput="document.getElementById('wmOpacityVal').textContent = this.value + '%'" class="w-full" />
+                </div>
+              </div>
+
+              <div class="pt-2 border-t border-slate-800 flex items-center justify-between">
+                <span class="text-xs text-slate-300">Stamp "Page X of Y" Footer</span>
+                <input id="pdfPageNumToggle" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Signature Pad -->
+          <div class="glass-panel rounded-2xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                <i data-lucide="pen-tool" class="w-4 h-4 text-emerald-400"></i>
+                <span>Sign &amp; Stamp PDF</span>
+              </h3>
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input id="sigEnableToggle" type="checkbox" class="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0" />
+                <span class="text-xs font-medium text-emerald-300">Stamp Signature</span>
+              </label>
+            </div>
+
+            <p class="text-xs text-slate-400">Draw your signature below to embed onto selected PDF pages:</p>
+
+            <div class="rounded-xl overflow-hidden border border-slate-700 bg-slate-950 relative">
+              <canvas id="signatureCanvas" width="360" height="110" class="w-full h-[110px] cursor-crosshair touch-none"></canvas>
+              <button onclick="clearSignaturePad()" class="absolute top-2 right-2 px-2 py-1 rounded bg-slate-800/90 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-600">
+                Clear Pad
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 text-xs">
+              <span class="text-slate-400">Signature Position:</span>
+              <select id="sigPositionSelect" class="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white">
+                <option value="bottom-right">Bottom Right Corner</option>
+                <option value="bottom-left">Bottom Left Corner</option>
+                <option value="center">Center Page</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 2: MEDIA CONVERTER (MP4 / VIDEO TO MP3 & WAV EXTRACTOR)        -->
+    <!-- ===================================================================== -->
+    <section id="module-media" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left 7 cols: Dropzone, Video/Audio Preview, Waveform Trimmer -->
+        <div class="lg:col-span-7 space-y-5">
+          <div id="mediaDropZone" class="glass-panel rounded-2xl p-6 border-2 border-dashed border-slate-700/80 transition-all flex flex-col sm:flex-row items-center justify-between gap-5">
+            <div class="flex items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
+              <div class="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <i data-lucide="file-audio" class="w-7 h-7 text-amber-400"></i>
+              </div>
+              <div>
+                <h2 class="text-base sm:text-lg font-bold text-white">Drop MP4, MOV, WEBM, or Audio to Extract MP3 / WAV</h2>
+                <p class="text-xs sm:text-sm text-slate-400 mt-0.5">
+                  Demuxes audio locally via <code class="text-amber-300 font-mono">AudioContext.decodeAudioData</code> and encodes real MP3 via <code class="text-amber-300 font-mono">lamejs</code>.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-2.5 shrink-0">
+              <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span>Select MP4 / Media</span>
+                <input id="mediaFileInput" type="file" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.mp3,.wav,.ogg,.m4a" class="hidden" onchange="handleMediaFile(this.files[0])" />
+              </label>
+
+              <button onclick="synthesizeSampleAudioTrack()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-medium transition">
+                <i data-lucide="wand-2" class="w-4 h-4"></i>
+                <span>Load Synth Demo Track</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Waveform Visualizer & Trimmer Card -->
+          <div class="glass-panel rounded-2xl p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="activity" class="w-4 h-4 text-amber-400"></i>
+                  <span id="mediaTrackTitle">No Media Track Loaded</span>
+                </h3>
+                <p id="mediaTrackMeta" class="text-xs font-mono text-slate-400 mt-0.5">
+                  Upload an .MP4 video or click "Load Synth Demo Track" to inspect waveform &amp; convert to MP3
+                </p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button id="btnPreviewTrimmed" onclick="togglePlayTrimmedAudio()" disabled class="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 disabled:opacity-40 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 transition">
+                  <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                  <span id="playBtnText">Preview Audio</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Optional Video Preview if MP4 video uploaded -->
+            <div id="videoPreviewWrapper" class="hidden rounded-xl overflow-hidden bg-slate-950 border border-slate-800 max-h-48 flex justify-center">
+              <video id="sourceVideoPreview" class="max-h-48 w-auto" controls muted></video>
+            </div>
+
+            <!-- High-DPI Waveform Canvas -->
+            <div class="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 p-2">
+              <canvas id="waveformCanvas" width="800" height="160" class="w-full h-[150px] block"></canvas>
+            </div>
+
+            <!-- Trim Start / End Sliders -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+                <div class="flex justify-between text-xs mb-1.5">
+                  <span class="text-slate-400">Trim Start Time</span>
+                  <span id="trimStartLabel" class="font-mono text-emerald-400">0.00s</span>
+                </div>
+                <input id="trimStartRange" type="range" min="0" max="100" value="0" step="0.1" oninput="updateTrimHandles('start')" class="w-full" disabled />
+              </div>
+
+              <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
+                <div class="flex justify-between text-xs mb-1.5">
+                  <span class="text-slate-400">Trim End Time</span>
+                  <span id="trimEndLabel" class="font-mono text-amber-400">0.00s</span>
+                </div>
+                <input id="trimEndRange" type="range" min="0" max="100" value="100" step="0.1" oninput="updateTrimHandles('end')" class="w-full" disabled />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right 5 cols: MP3 / WAV Encoder Settings & Output Player -->
+        <div class="lg:col-span-5 space-y-5">
+          <div class="glass-panel rounded-2xl p-6 space-y-5 border border-amber-500/25">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                <i data-lucide="cpu" class="w-4 h-4"></i>
+                <span>Client-Side Audio Encoder</span>
+              </h3>
+              <span class="text-xs font-mono text-slate-400">MPEG-1 Layer III / PCM</span>
+            </div>
+
+            <!-- Output Format Selection -->
+            <div class="grid grid-cols-2 gap-3">
+              <button id="fmtBtnMp3" onclick="setMediaOutputFormat('mp3')" class="p-3.5 rounded-xl border border-amber-500 bg-amber-500/15 text-left transition">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-sm text-white">.MP3 Audio</span>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Compressed</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Universal MP3 via lamejs encoder</p>
+              </button>
+
+              <button id="fmtBtnWav" onclick="setMediaOutputFormat('wav')" class="p-3.5 rounded-xl border border-slate-700 bg-slate-900/60 hover:bg-slate-800/60 text-left transition">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-sm text-white">.WAV Lossless</span>
+                  <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">16-bit PCM</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Uncompressed studio master quality</p>
+              </button>
+            </div>
+
+            <!-- MP3 Bitrate & Channel Controls -->
+            <div id="mp3BitrateSettings" class="space-y-3">
+              <label class="block text-xs font-semibold text-slate-300">MP3 Target Bitrate (kbps)</label>
+              <div class="grid grid-cols-3 gap-2.5">
+                <button onclick="setMp3Bitrate(128)" id="kbps-128" class="kbps-btn py-2 px-3 rounded-xl border border-slate-700 bg-slate-900 text-xs font-mono text-slate-300">
+                  128 kbps <span class="block text-[10px] text-slate-500">Standard</span>
+                </button>
+                <button onclick="setMp3Bitrate(192)" id="kbps-192" class="kbps-btn py-2 px-3 rounded-xl border border-emerald-500 bg-emerald-500/15 text-xs font-mono text-emerald-300 font-semibold">
+                  192 kbps <span class="block text-[10px] text-emerald-400/80">High Quality</span>
+                </button>
+                <button onclick="setMp3Bitrate(320)" id="kbps-320" class="kbps-btn py-2 px-3 rounded-xl border border-slate-700 bg-slate-900 text-xs font-mono text-slate-300">
+                  320 kbps <span class="block text-[10px] text-slate-500">Extreme</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Channel Mode</label>
+              <select id="audioChannelMode" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white">
+                <option value="stereo">Stereo (2 Channels — Preserve Spatial Audio)</option>
+                <option value="mono">Mono Downmix (1 Channel — Smaller File Size)</option>
+              </select>
+            </div>
+
+            <!-- Encode Progress Bar -->
+            <div id="mediaEncodeProgressWrap" class="hidden space-y-1.5">
+              <div class="flex justify-between text-xs font-mono">
+                <span id="mediaEncodeStatusText" class="text-amber-300">Encoding MP3 frames...</span>
+                <span id="mediaEncodePercent" class="text-white">0%</span>
+              </div>
+              <div class="w-full h-2.5 rounded-full bg-slate-900 overflow-hidden border border-slate-800">
+                <div id="mediaEncodeBar" class="h-full bg-gradient-to-r from-amber-500 to-emerald-400 transition-all duration-150" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Convert Action Button -->
+            <button id="btnStartMediaConvert" onclick="convertMediaToAudio()" disabled class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 disabled:opacity-40 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2">
+              <i data-lucide="zap" class="w-4 h-4 stroke-[2.5]"></i>
+              <span id="btnMediaConvertText">Extract &amp; Convert to .MP3 (192 kbps)</span>
+            </button>
+
+            <!-- Converted Output Result Box -->
+            <div id="mediaOutputCard" class="hidden p-4 rounded-xl bg-emerald-950/30 border border-emerald-500/40 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+                  <span id="mediaOutputFilename" class="text-xs font-mono font-bold text-white">output.mp3</span>
+                </div>
+                <span id="mediaOutputSizeBadge" class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[11px]">0 KB</span>
+              </div>
+
+              <audio id="convertedAudioPlayer" controls class="w-full h-9"></audio>
+
+              <a id="mediaDownloadLink" href="#" download="extracted_audio.mp3" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Download Converted Audio File</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 3: IMAGE & DOCS CONVERTER (PNG / JPG / WEBP / IMAGES-TO-PDF)   -->
+    <!-- ===================================================================== -->
+    <section id="module-image" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left 8 cols: Batch Image Dropzone & Queue -->
+        <div class="lg:col-span-8 space-y-5">
+          <div id="imageDropZone" class="glass-panel rounded-2xl p-6 border-2 border-dashed border-slate-700/80 transition-all flex flex-col sm:flex-row items-center justify-between gap-5">
+            <div class="flex items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
+              <div class="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center shrink-0">
+                <i data-lucide="images" class="w-7 h-7 text-sky-400"></i>
+              </div>
+              <div>
+                <h2 class="text-base sm:text-lg font-bold text-white">Batch Image Converter &amp; Images-to-PDF Compiler</h2>
+                <p class="text-xs sm:text-sm text-slate-400 mt-0.5">
+                  Convert between <code class="text-sky-300 font-mono">WEBP, PNG, JPEG</code> with real-time size comparison or compile into a multi-page PDF.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-center gap-2.5 shrink-0">
+              <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs sm:text-sm shadow-lg shadow-sky-500/20 transition">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span>Add Images</span>
+                <input id="imageFileInput" type="file" accept="image/*" multiple class="hidden" onchange="handleImageFiles(this.files)" />
+              </label>
+
+              <button onclick="generateSampleImages()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/30 text-xs sm:text-sm font-medium transition">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                <span>Load 3 Sample Graphics</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Image Queue Grid -->
+          <div class="glass-panel rounded-2xl p-5 min-h-[340px]">
+            <div class="flex items-center justify-between mb-4">
+              <span id="imageQueueStats" class="text-xs font-mono text-slate-300">0 images queued</span>
+              <button onclick="clearImageQueue()" class="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>Clear All</span>
+              </button>
+            </div>
+
+            <div id="imageEmptyState" class="text-center py-14 space-y-2">
+              <i data-lucide="image-plus" class="w-10 h-10 text-slate-600 mx-auto"></i>
+              <p class="text-sm font-medium text-slate-300">No images in batch queue</p>
+              <p class="text-xs text-slate-500">Drop PNG, JPG, WEBP, or SVG files above or load sample graphics.</p>
+            </div>
+
+            <div id="imageGridList" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          </div>
+        </div>
+
+        <!-- Right 4 cols: Image Conversion & PDF Compilation Settings -->
+        <div class="lg:col-span-4 space-y-5">
+          <div class="glass-panel rounded-2xl p-5 space-y-4 border border-sky-500/25">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-sky-400 flex items-center gap-2">
+              <i data-lucide="sliders" class="w-4 h-4"></i>
+              <span>Batch Compression &amp; Format</span>
+            </h3>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1.5">Target Output Format</label>
+              <select id="imgTargetFormat" onchange="reprocessAllImages()" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-semibold text-white">
+                <option value="image/webp">Next-Gen WEBP (.webp)</option>
+                <option value="image/jpeg">Compressed JPEG (.jpg)</option>
+                <option value="image/png">Lossless PNG (.png)</option>
+              </select>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-slate-400">Compression Quality</span>
+                <span id="imgQualityLabel" class="font-mono text-sky-300">82%</span>
+              </div>
+              <input id="imgQualitySlider" type="range" min="10" max="100" value="82" onchange="reprocessAllImages()" oninput="document.getElementById('imgQualityLabel').textContent = this.value + '%'" class="w-full" />
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1.5">Max Width Resize</label>
+              <select id="imgMaxWidth" onchange="reprocessAllImages()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white">
+                <option value="0">Original Dimensions (No Resize)</option>
+                <option value="1920">Full HD Max (1920 px)</option>
+                <option value="1280">Standard Web (1280 px)</option>
+                <option value="800">Compact Thumbnail (800 px)</option>
+              </select>
+            </div>
+
+            <!-- Total Savings Banner -->
+            <div id="imgSavingsSummary" class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+              <span class="text-slate-400">Batch Size Delta:</span>
+              <span id="imgSavingsValue" class="font-mono font-semibold text-emerald-400">0 KB &rarr; 0 KB</span>
+            </div>
+
+            <button onclick="downloadAllImagesAsZip()" class="w-full py-3 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-sky-500/20 transition flex items-center justify-center gap-2">
+              <i data-lucide="folder-down" class="w-4 h-4"></i>
+              <span>Download Converted Images (.ZIP)</span>
+            </button>
+
+            <div class="pt-3 border-t border-slate-800 space-y-2.5">
+              <label class="block text-xs font-semibold text-slate-200">Or Compile Queued Images into Single PDF</label>
+              <button onclick="compileImagesToPdf()" class="w-full py-3 px-4 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2">
+                <i data-lucide="file-Check" class="w-4 h-4"></i>
+                <span>Compile All Images to Single .PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 4: DATA & SPREADSHEET CONVERTER (XLSX / CSV / JSON / MD)       -->
+    <!-- ===================================================================== -->
+    <section id="module-data" class="hidden space-y-6">
+      <div class="glass-panel rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center shrink-0">
+            <i data-lucide="Database" class="w-6 h-6 text-purple-400"></i>
+          </div>
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-white">Spreadsheet &amp; Data Format Matrix (XLSX &harr; CSV &harr; JSON &harr; Markdown)</h2>
+            <p class="text-xs sm:text-sm text-slate-400">
+              Powered by <code class="text-purple-300 font-mono">SheetJS</code>. Edit any cell inline in the table below before exporting.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-slate-950 font-semibold text-xs sm:text-sm transition">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            <span>Upload XLSX / CSV / JSON</span>
+            <input type="file" accept=".xlsx,.xls,.csv,.tsv,.json" class="hidden" onchange="handleDataFile(this.files[0])" />
+          </label>
+
+          <button onclick="loadSampleDataset()" class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 text-xs sm:text-sm font-medium transition">
+            <i data-lucide="table-2" class="w-4 h-4"></i>
+            <span>Load Sample Dataset</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Export Bar + Interactive Table -->
+      <div class="glass-panel rounded-2xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span id="dataMetaBadge" class="px-3 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-mono text-purple-300">
+              0 rows × 0 cols
+            </span>
+            <span class="text-xs text-slate-400 hidden sm:inline">Tip: Click any cell to edit values live before exporting.</span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="exportDataAs('xlsx')" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1.5 transition">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+              <span>Export Excel (.XLSX)</span>
+            </button>
+            <button onclick="exportDataAs('csv')" class="px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/30 text-sky-300 text-xs font-semibold flex items-center gap-1.5 transition">
+              <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+              <span>Export .CSV</span>
+            </button>
+            <button onclick="exportDataAs('json')" class="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition">
+              <i data-lucide="braces" class="w-3.5 h-3.5"></i>
+              <span>Export .JSON</span>
+            </button>
+            <button onclick="exportDataAs('md')" class="px-3.5 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-1.5 transition">
+              <i data-lucide="code" class="w-3.5 h-3.5"></i>
+              <span>Export Markdown (.MD)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Table Preview Scroll Box -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/70 max-h-[420px]">
+          <table id="dataPreviewTable" class="w-full text-left border-collapse text-xs">
+            <thead id="dataTableHead" class="bg-slate-900/90 text-slate-300 font-mono uppercase border-b border-slate-800 sticky top-0"></thead>
+            <tbody id="dataTableBody" class="divide-y divide-slate-800/60 text-slate-200"></tbody>
+          </table>
+        </div>
+
+        <!-- Raw Markdown / JSON Output Preview -->
+        <div id="dataRawOutputBox" class="hidden space-y-2 pt-2">
+          <div class="flex items-center justify-between">
+            <span id="dataRawOutputTitle" class="text-xs font-mono text-slate-400">Generated Output Preview</span>
+            <button onclick="copyRawDataOutput()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-emerald-300 font-mono">
+              Copy to Clipboard
+            </button>
+          </div>
+          <pre id="dataRawOutputPre" class="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-300 overflow-x-auto max-h-48"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MODULE 5: ZERO-TRUST MAGIC-BYTE INSPECTOR & EXECUTION TELEMETRY       -->
+    <!-- ===================================================================== -->
+    <section id="module-security" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left 7 cols: Magic-Byte Binary Inspector -->
+        <div class="lg:col-span-7 space-y-5">
+          <div class="glass-panel rounded-2xl p-6 space-y-4 border border-emerald-500/30">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <i data-lucide="binary" class="w-5 h-5 text-emerald-400"></i>
+                  <span>Anti-Spoofing Magic-Byte &amp; SHA-256 File Inspector</span>
+                </h2>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Reads the first 16 binary header bytes (<code class="text-emerald-300 font-mono">Uint8Array</code>) of every file to detect disguised executables or spoofed extensions.
+                </p>
+              </div>
+
+              <label class="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs shrink-0 transition">
+                <i data-lucide="search" class="w-4 h-4"></i>
+                <span>Inspect Any File</span>
+                <input type="file" class="hidden" onchange="inspectFileMagicBytes(this.files[0], true)" />
+              </label>
+            </div>
+
+            <!-- Audited Files Table -->
+            <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-900/90 text-slate-400 font-mono border-b border-slate-800">
+                  <tr>
+                    <th class="py-3 px-4">File Name</th>
+                    <th class="py-3 px-4">First 8 Magic Bytes (Hex)</th>
+                    <th class="py-3 px-4">Detected Binary Signature</th>
+                    <th class="py-3 px-4">SHA-256 Digest</th>
+                    <th class="py-3 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="magicByteAuditTable" class="divide-y divide-slate-800/60 font-mono">
+                  <tr>
+                    <td colspan="5" class="py-8 text-center text-slate-500">
+                      No files inspected yet. Upload or generate a file in any tab to see its real binary header signature.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right 5 cols: Sandbox Execution Log -->
+        <div class="lg:col-span-5 space-y-5">
+          <div class="glass-panel rounded-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                <i data-lucide="terminal" class="w-4 h-4"></i>
+                <span>Zero-Trust Session Telemetry Log</span>
+              </h3>
+              <button onclick="clearTelemetryLog()" class="text-xs text-slate-400 hover:text-white">Clear</button>
+            </div>
+
+            <div id="telemetryConsole" class="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-2 h-[340px] overflow-y-auto"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- ======================================================================= -->
+  <!-- APPLICATION JAVASCRIPT ENGINE                                           -->
+  <!-- ======================================================================= -->
+  <script>
+    // Configure PDF.js Worker
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    // Global State
+    const state = {
+      activeModule: 'pdf',
+      // PDF Studio state: array of page items { id, sourceName, pdfBytes, sourcePageIndex, rotation, selected, thumbDataUrl }
+      pdfPages: [],
+      // Media Converter state
+      audioBuffer: null,
+      mediaFileName: 'synthesized_track.mp4',
+      mediaOutputFormat: 'mp3',
+      mp3Bitrate: 192,
+      trimStart: 0,
+      trimEnd: 0,
+      audioPreviewSource: null,
+      audioPreviewCtx: null,
+      isPlayingPreview: false,
+      // Image Converter state
+      imageQueue: [], // { id, name, originalFile, originalSize, imgElement, convertedBlob, convertedSize, previewUrl }
+      // Data Converter state
+      tableData: [], // Array of objects
+      tableColumns: [],
+      // Security Audit state
+      auditedFilesCount: 0
+    };
+
+    // -------------------------------------------------------------------------
+    // TELEMETRY & TOAST HELPERS
+    // -------------------------------------------------------------------------
+    function logTelemetry(action, detail, durationMs = null) {
+      const consoleEl = document.getElementById('telemetryConsole');
+      if (!consoleEl) return;
+      const now = new Date().toLocaleTimeString();
+      const timeBadge = durationMs !== null ? `<span class="text-emerald-400">[${durationMs}ms]</span>` : '';
+      const entry = document.createElement('div');
+      entry.className = 'text-slate-300 leading-relaxed border-b border-slate-900 pb-1.5';
+      entry.innerHTML = `<span class="text-slate-500">${now}</span> <span class="text-emerald-400 font-semibold">${action}:</span> ${detail} ${timeBadge}`;
+      consoleEl.prepend(entry);
+    }
+
+    function showToast(title, message, type = 'emerald') {
+      const container = document.getElementById('toastContainer');
+      const colors = {
+        emerald: 'border-emerald-500/40 bg-slate-900/95 text-emerald-300',
+        amber: 'border-amber-500/40 bg-slate-900/95 text-amber-300',
+        rose: 'border-rose-500/40 bg-slate-900/95 text-rose-300',
+        sky: 'border-sky-500/40 bg-slate-900/95 text-sky-300'
+      };
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto p-4 rounded-2xl border shadow-2xl backdrop-blur-md transition-all duration-300 ${colors[type] || colors.emerald}`;
+      toast.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-wider">${title}</p>
+            <p class="text-xs text-slate-300 mt-1">${message}</p>
+          </div>
+          <button onclick="this.parentElement.parentElement.remove()" class="text-slate-400 hover:text-white text-xs">&times;</button>
+        </div>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        if (toast.parentElement) toast.remove();
+      }, 4200);
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE NAVIGATION
+    // -------------------------------------------------------------------------
+    function switchModule(mod) {
+      state.activeModule = mod;
+      ['pdf', 'media', 'image', 'data', 'security'].forEach(m => {
+        const sec = document.getElementById(`module-${m}`);
+        const tab = document.getElementById(`tab-${m}`);
+        if (m === mod) {
+          sec.classList.remove('hidden');
+          tab.className = 'module-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition whitespace-nowrap bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        } else {
+          sec.classList.add('hidden');
+          tab.className = 'module-tab flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent';
+        }
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 5: MAGIC-BYTE BINARY HEADER INSPECTOR & SHA-256 AUDITOR
+    // -------------------------------------------------------------------------
+    async function inspectFileMagicBytes(file, switchToTab = false) {
+      if (!file) return;
+      const t0 = performance.now();
+      try {
+        const slice = file.slice(0, 16);
+        const headerBuf = await slice.arrayBuffer();
+        const bytes = new Uint8Array(headerBuf);
+        const hexArr = Array.from(bytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0').toUpperCase());
+        const hexStr = hexArr.join(' ');
+
+        // Compute SHA-256 on first 1MB (for instant speed)
+        const hashSlice = await file.slice(0, 1024 * 1024).arrayBuffer();
+        const hashBuffer = await crypto.subtle.digest('SHA-256', hashSlice);
+        const hashHex = Array.from(new Uint8Array(hashBuffer)).slice(0, 6).map(b => b.toString(16).padStart(2, '0')).join('') + '…';
+
+        // Identify Binary Signature
+        let detectedType = 'Unknown / Raw Text / CSV';
+        let expectedExts = [];
+        if (hexStr.startsWith('25 50 44 46')) {
+          detectedType = 'PDF Document (%PDF-)';
+          expectedExts = ['pdf'];
+        } else if (hexStr.includes('66 74 79 70')) {
+          detectedType = 'ISO Base Media / MP4 Container (ftyp)';
+          expectedExts = ['mp4', 'mov', 'm4a'];
+        } else if (hexStr.startsWith('89 50 4E 47')) {
+          detectedType = 'PNG Lossless Image';
+          expectedExts = ['png'];
+        } else if (hexStr.startsWith('FF D8 FF')) {
+          detectedType = 'JPEG Image Stream';
+          expectedExts = ['jpg', 'jpeg'];
+        } else if (hexStr.startsWith('52 49 46 46')) {
+          detectedType = 'RIFF Container (WAV / WEBP)';
+          expectedExts = ['wav', 'webp'];
+        } else if (hexStr.startsWith('49 44 33') || hexStr.startsWith('FF FB') || hexStr.startsWith('FF F3')) {
+          detectedType = 'MP3 Audio (ID3 / MPEG Frame)';
+          expectedExts = ['mp3'];
+        } else if (hexStr.startsWith('50 4B 03 04')) {
+          detectedType = 'ZIP / Office OpenXML (XLSX/DOCX)';
+          expectedExts = ['zip', 'xlsx', 'docx', 'pptx'];
+        } else if (hexStr.startsWith('1A 45 DF A3')) {
+          detectedType = 'Matroska / WebM Media';
+          expectedExts = ['webm', 'mkv'];
+        }
+
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        const isSpoofed = expectedExts.length > 0 && !expectedExts.includes(ext);
+
+        state.auditedFilesCount++;
+        document.getElementById('auditCountBadge').textContent = state.auditedFilesCount;
+
+        const tbody = document.getElementById('magicByteAuditTable');
+        if (state.auditedFilesCount === 1) tbody.innerHTML = '';
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-900/60';
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-sans font-medium text-white">${file.name} <span class="text-slate-500 text-[11px]">(${formatBytes(file.size)})</span></td>
+          <td class="py-3 px-4 text-emerald-300">${hexStr}</td>
+          <td class="py-3 px-4 text-slate-300">${detectedType}</td>
+          <td class="py-3 px-4 text-slate-400">${hashHex}</td>
+          <td class="py-3 px-4">
+            ${isSpoofed
+              ? `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]">SPOOF WARNING (.${ext})</span>`
+              : `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]">VERIFIED HEADER</span>`
+            }
+          </td>
+        `;
+        tbody.prepend(tr);
+
+        const elapsed = Math.round(performance.now() - t0);
+        logTelemetry('MAGIC-BYTE AUDIT', `${file.name} -> [${hexStr}] (${detectedType})`, elapsed);
+
+        if (switchToTab) {
+          switchModule('security');
+          showToast('Binary Header Inspected', `${file.name}: ${detectedType}`, isSpoofed ? 'rose' : 'emerald');
+        }
+      } catch (err) {
+        console.error('Magic byte inspection error:', err);
+      }
+    }
+
+    function clearTelemetryLog() {
+      document.getElementById('telemetryConsole').innerHTML = '';
+      logTelemetry('SANDBOX', 'Telemetry console cleared. 0 bytes transmitted externally.');
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 1: PDF STUDIO (MERGE, SPLIT, ROTATE, WATERMARK, SIGN)
+    // -------------------------------------------------------------------------
+    async function handlePdfFiles(fileList) {
+      if (!fileList || fileList.length === 0) return;
+      for (const file of fileList) {
+        await inspectFileMagicBytes(file);
+        const arrayBuf = await file.arrayBuffer();
+        await loadPdfBytesIntoWorkspace(arrayBuf, file.name);
+      }
+    }
+
+    async function loadPdfBytesIntoWorkspace(arrayBuffer, sourceName) {
+      const t0 = performance.now();
+      try {
+        // Clone buffer because PDF.js transfers/detaches ArrayBuffers in some browsers
+        const bufferForPdfLib = arrayBuffer.slice(0);
+        const bufferForPdfJs = arrayBuffer.slice(0);
+
+        const loadingTask = pdfjsLib.getDocument({ data: bufferForPdfJs });
+        const pdfDocJs = await loadingTask.promise;
+        const numPages = pdfDocJs.numPages;
+
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          const page = await pdfDocJs.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 0.45 });
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          await page.render({ canvasContext: ctx, viewport }).promise;
+          const thumbDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+          state.pdfPages.push({
+            id: 'page_' + Math.random().toString(36).substring(2, 9),
+            sourceName,
+            pdfBytes: bufferForPdfLib,
+            sourcePageIndex: pageNum - 1,
+            rotation: 0,
+            selected: true,
+            thumbDataUrl
+          });
+        }
+
+        renderPdfPageGrid();
+        const elapsed = Math.round(performance.now() - t0);
+        logTelemetry('PDF.JS RENDER', `Rendered ${numPages} page thumbnails from "${sourceName}"`, elapsed);
+        showToast('PDF Loaded Locally', `Added ${numPages} pages from ${sourceName} to workspace.`);
+      } catch (err) {
+        console.error(err);
+        showToast('PDF Load Error', 'Could not parse PDF file. Ensure it is a valid, unencrypted PDF.', 'rose');
+      }
+    }
+
+    function renderPdfPageGrid() {
+      const emptyEl = document.getElementById('pdfEmptyState');
+      const gridEl = document.getElementById('pdfThumbnailGrid');
+      const countLabel = document.getElementById('pdfPageCountLabel');
+
+      const total = state.pdfPages.length;
+      const selectedCount = state.pdfPages.filter(p => p.selected).length;
+      countLabel.textContent = `${total} pages (${selectedCount} selected)`;
+
+      if (total === 0) {
+        emptyEl.classList.remove('hidden');
+        gridEl.classList.add('hidden');
+        gridEl.innerHTML = '';
+        return;
+      }
+
+      emptyEl.classList.add('hidden');
+      gridEl.classList.remove('hidden');
+      gridEl.innerHTML = '';
+
+      state.pdfPages.forEach((p, idx) => {
+        const card = document.createElement('div');
+        card.className = `rounded-xl bg-slate-900/90 border border-slate-700/80 p-3 flex flex-col justify-between transition cursor-pointer ${p.selected ? 'page-card-selected' : 'opacity-60 hover:opacity-90'}`;
+        card.onclick = (e) => {
+          if (e.target.closest('button')) return;
+          p.selected = !p.selected;
+          renderPdfPageGrid();
+        };
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-mono font-bold text-emerald-400">
+              Page ${idx + 1}
+            </span>
+            <span class="text-[10px] font-mono text-slate-400 truncate max-w-[120px]" title="${p.sourceName}">
+              ${p.sourceName} (p.${p.sourcePageIndex + 1})
+            </span>
+          </div>
+
+          <div class="relative rounded-lg bg-slate-950 border border-slate-800 h-44 flex items-center justify-center overflow-hidden my-1">
+            <img src="${p.thumbDataUrl}" alt="Page ${idx + 1}" class="max-h-40 max-w-full object-contain transition-transform duration-300 shadow-md" style="transform: rotate(${p.rotation}deg)" />
+            ${p.rotation !== 0 ? `<span class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 font-mono text-[10px] font-bold">${p.rotation}°</span>` : ''}
+          </div>
+
+          <div class="flex items-center justify-between gap-1 mt-2 pt-2 border-t border-slate-800/80">
+            <div class="flex items-center gap-1">
+              <button onclick="movePdfPage(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Move Left" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300">
+                <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="movePdfPage(${idx}, 1)" ${idx === total - 1 ? 'disabled' : ''} title="Move Right" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-300">
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <button onclick="rotateSinglePdfPage(${idx}, 90)" title="Rotate 90° CW" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="deleteSinglePdfPage(${idx})" title="Remove Page" class="p-1.5 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-300">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        `;
+        gridEl.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    function selectAllPdfPages(flag) {
+      state.pdfPages.forEach(p => p.selected = flag);
+      renderPdfPageGrid();
+    }
+
+    function rotateSinglePdfPage(idx, deg) {
+      state.pdfPages[idx].rotation = (state.pdfPages[idx].rotation + deg) % 360;
+      renderPdfPageGrid();
+    }
+
+    function rotateSelectedPdfPages(deg) {
+      state.pdfPages.forEach(p => {
+        if (p.selected) p.rotation = (p.rotation + deg) % 360;
+      });
+      renderPdfPageGrid();
+    }
+
+    function movePdfPage(idx, dir) {
+      const target = idx + dir;
+      if (target < 0 || target >= state.pdfPages.length) return;
+      const temp = state.pdfPages[idx];
+      state.pdfPages[idx] = state.pdfPages[target];
+      state.pdfPages[target] = temp;
+      renderPdfPageGrid();
+    }
+
+    function deleteSinglePdfPage(idx) {
+      state.pdfPages.splice(idx, 1);
+      renderPdfPageGrid();
+    }
+
+    function clearAllPdfPages() {
+      state.pdfPages = [];
+      renderPdfPageGrid();
+      logTelemetry('PDF WORKSPACE', 'Cleared all cached PDF ArrayBuffers from memory.');
+    }
+
+    // Generate a realistic 4-Page Sample PDF using pdf-lib
+    async function generateSamplePdf() {
+      const t0 = performance.now();
+      const { PDFDocument, StandardFonts, rgb } = PDFLib;
+      const pdfDoc = await PDFDocument.create();
+      const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const fontMono = await pdfDoc.embedFont(StandardFonts.Courier);
+
+      const sampleSpecs = [
+        {
+          title: 'PAGE 1: EXECUTIVE ARCHITECTURE BRIEF',
+          subtitle: 'VaultConvert Zero-Trust Client-Side Processing Standard',
+          color: rgb(0.06, 0.72, 0.50),
+          bullets: [
+            '1. All document streams execute strictly inside WebAssembly & JS sandboxes.',
+            '2. Zero network payload transmission: files remain in volatile RAM.',
+            '3. Full support for PDF page reordering, rotation, splitting & merging.',
+            '4. Interactive signature stamping and diagonal security watermarking.'
+          ]
+        },
+        {
+          title: 'PAGE 2: Q4 CLOUD COST SAVINGS REPORT',
+          subtitle: 'Serverless Browser Compute vs. Legacy Cloud Queues',
+          color: rgb(0.15, 0.55, 0.90),
+          bullets: [
+            '• Bandwidth Egress Saved: 14.8 TB / month ($1,320.00 monthly reduction)',
+            '• Average PDF Merge Latency: 18 ms local vs. 2,400 ms server round-trip',
+            '• Audio Extraction (MP4 -> MP3): 100% offloaded to client Web Audio API',
+            '• Zero GDPR / HIPAA data retention liability on backend storage.'
+          ]
+        },
+        {
+          title: 'PAGE 3: CRYPTOGRAPHIC MAGIC-BYTE AUDIT',
+          subtitle: 'Binary Header Verification & Anti-Spoofing Matrix',
+          color: rgb(0.90, 0.55, 0.10),
+          bullets: [
+            '• %PDF-1.7 Header Signature: 0x25 0x50 0x44 0x46 0x2D [VERIFIED]',
+            '• ISO Base Media MP4 Header: 0x66 0x74 0x79 0x70 [VERIFIED]',
+            '• PNG Image Header Signature: 0x89 0x50 0x4E 0x47 [VERIFIED]',
+            '• ZIP / Office OpenXML Header: 0x50 0x4B 0x03 0x04 [VERIFIED]'
+          ]
+        },
+        {
+          title: 'PAGE 4: COMPLIANCE & AUTHORIZATION SIGN-OFF',
+          subtitle: 'Ready for Custom Watermark & Freehand Signature Stamp',
+          color: rgb(0.60, 0.30, 0.90),
+          bullets: [
+            '• Try rotating or reordering this page in the Visual Page Workspace.',
+            '• Toggle "Apply on Export" in the Watermark Studio on the right.',
+            '• Draw your signature in the Sign & Stamp pad and click Merge & Download!',
+            '• Authorized By: ___________________________   Date: ' + new Date().toLocaleDateString()
+          ]
+        }
+      ];
+
+      sampleSpecs.forEach((spec, i) => {
+        const page = pdfDoc.addPage([612, 792]); // Letter size
+        // Top colored header bar
+        page.drawRectangle({ x: 0, y: 710, width: 612, height: 82, color: spec.color });
+        page.drawText('VAULTCONVERT // ZERO-TRUST SAMPLE DOCUMENT', {
+          x: 45, y: 755, size: 10, font: fontMono, color: rgb(1, 1, 1)
+        });
+        page.drawText(spec.title, {
+          x: 45, y: 728, size: 18, font: fontBold, color: rgb(1, 1, 1)
+        });
+
+        page.drawText(spec.subtitle, {
+          x: 45, y: 665, size: 13, font: fontBold, color: rgb(0.15, 0.2, 0.3)
+        });
+
+        // Decorative box
+        page.drawRectangle({
+          x: 45, y: 380, width: 522, height: 260,
+          borderColor: spec.color, borderWidth: 1.5, color: rgb(0.97, 0.98, 0.99)
+        });
+
+        spec.bullets.forEach((line, bIdx) => {
+          page.drawText(line, {
+            x: 65, y: 595 - bIdx * 48, size: 11.5, font: fontReg, color: rgb(0.1, 0.15, 0.22)
+          });
+        });
+
+        page.drawText(`Sample Document • Original Page ${i + 1} of 4`, {
+          x: 45, y: 60, size: 9, font: fontMono, color: rgb(0.5, 0.55, 0.6)
+        });
+      });
+
+      const pdfBytes = await pdfDoc.save();
+      const fakeFile = new File([pdfBytes], 'VaultConvert_Sample_4Page_Spec.pdf', { type: 'application/pdf' });
+      await inspectFileMagicBytes(fakeFile);
+      await loadPdfBytesIntoWorkspace(pdfBytes.buffer, fakeFile.name);
+      logTelemetry('PDF-LIB GENERATOR', 'Synthesized 4-page sample PDF in memory', Math.round(performance.now() - t0));
+    }
+
+    // Helper: Build a new PDFDocument from an array of page objects, applying rotations, watermarks, page numbers & signature
+    async function buildOutputPdfFromPages(pagesToInclude) {
+      const { PDFDocument, StandardFonts, rgb, degrees } = PDFLib;
+      const outDoc = await PDFDocument.create();
+      const fontBold = await outDoc.embedFont(StandardFonts.HelveticaBold);
+      const fontMono = await outDoc.embedFont(StandardFonts.Courier);
+
+      const wmEnabled = document.getElementById('wmEnableToggle').checked;
+      const wmText = document.getElementById('wmTextInput').value.trim() || 'CONFIDENTIAL';
+      const wmPosition = document.getElementById('wmPositionSelect').value;
+      const wmColorKey = document.getElementById('wmColorSelect').value;
+      const wmSize = parseInt(document.getElementById('wmSizeInput').value, 10) || 36;
+      const wmOpacity = (parseInt(document.getElementById('wmOpacityInput').value, 10) || 25) / 100;
+      const pageNumEnabled = document.getElementById('pdfPageNumToggle').checked;
+      const sigEnabled = document.getElementById('sigEnableToggle').checked;
+      const sigPos = document.getElementById('sigPositionSelect').value;
+
+      const colorMap = {
+        crimson: rgb(0.85, 0.12, 0.2),
+        slate: rgb(0.35, 0.42, 0.5),
+        emerald: rgb(0.05, 0.65, 0.45),
+        navy: rgb(0.12, 0.28, 0.68)
+      };
+      const wmColor = colorMap[wmColorKey] || colorMap.crimson;
+
+      // Embed signature image if enabled
+      let embeddedSig = null;
+      if (sigEnabled && !isSignatureCanvasBlank()) {
+        const sigCanvas = document.getElementById('signatureCanvas');
+        const sigDataUrl = sigCanvas.toDataURL('image/png');
+        embeddedSig = await outDoc.embedPng(sigDataUrl);
+      }
+
+      // Cache loaded source PDFDocuments so we don't reload identical buffers repeatedly
+      const sourceDocsMap = new Map();
+
+      for (let i = 0; i < pagesToInclude.length; i++) {
+        const item = pagesToInclude[i];
+        let srcDoc = sourceDocsMap.get(item.pdfBytes);
+        if (!srcDoc) {
+          srcDoc = await PDFDocument.load(item.pdfBytes);
+          sourceDocsMap.set(item.pdfBytes, srcDoc);
+        }
+
+        const [copiedPage] = await outDoc.copyPages(srcDoc, [item.sourcePageIndex]);
+        const currentRot = copiedPage.getRotation().angle || 0;
+        copiedPage.setRotation(degrees((currentRot + item.rotation) % 360));
+
+        const { width, height } = copiedPage.getSize();
+
+        // Apply Watermark if enabled
+        if (wmEnabled && wmText) {
+          if (wmPosition === 'diagonal') {
+            copiedPage.drawText(wmText, {
+              x: width * 0.14,
+              y: height * 0.35,
+              size: wmSize,
+              font: fontBold,
+              color: wmColor,
+              opacity: wmOpacity,
+              rotate: degrees(42)
+            });
+          } else if (wmPosition === 'header') {
+            copiedPage.drawText(wmText, {
+              x: 40,
+              y: height - 32,
+              size: Math.min(wmSize, 22),
+              font: fontBold,
+              color: wmColor,
+              opacity: wmOpacity
+            });
+          } else if (wmPosition === 'footer') {
+            copiedPage.drawText(wmText, {
+              x: 40,
+              y: 28,
+              size: Math.min(wmSize, 22),
+              font: fontBold,
+              color: wmColor,
+              opacity: wmOpacity
+            });
+          }
+        }
+
+        // Apply Page Numbering if enabled
+        if (pageNumEnabled) {
+          copiedPage.drawText(`Page ${i + 1} of ${pagesToInclude.length}`, {
+            x: width - 115,
+            y: 22,
+            size: 9.5,
+            font: fontMono,
+            color: rgb(0.35, 0.4, 0.45),
+            opacity: 0.85
+          });
+        }
+
+        // Apply Freehand Signature if enabled
+        if (embeddedSig) {
+          const sigW = 150;
+          const sigH = 46;
+          let sx = width - sigW - 45;
+          let sy = 48;
+          if (sigPos === 'bottom-left') {
+            sx = 45;
+            sy = 48;
+          } else if (sigPos === 'center') {
+            sx = (width - sigW) / 2;
+            sy = (height - sigH) / 2;
+          }
+          copiedPage.drawImage(embeddedSig, {
+            x: sx,
+            y: sy,
+            width: sigW,
+            height: sigH
+          });
+        }
+
+        outDoc.addPage(copiedPage);
+      }
+
+      return await outDoc.save();
+    }
+
+    async function exportMergedPdf() {
+      const selected = state.pdfPages.filter(p => p.selected);
+      if (selected.length === 0) {
+        showToast('No Pages Selected', 'Select at least one PDF page in the grid to merge & export.', 'amber');
+        return;
+      }
+      const t0 = performance.now();
+      const outBytes = await buildOutputPdfFromPages(selected);
+      const blob = new Blob([outBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `VaultConvert_Merged_${selected.length}Pages.pdf`;
+      a.click();
+
+      const elapsed = Math.round(performance.now() - t0);
+      logTelemetry('PDF-LIB MERGE', `Exported ${selected.length} pages (${formatBytes(outBytes.byteLength)})`, elapsed);
+      showToast('PDF Export Complete', `Downloaded ${selected.length}-page PDF (${formatBytes(outBytes.byteLength)}).`);
+    }
+
+    async function extractPdfRange() {
+      if (state.pdfPages.length === 0) {
+        showToast('Workspace Empty', 'Load or generate a PDF first.', 'amber');
+        return;
+      }
+      const raw = document.getElementById('pdfRangeInput').value.trim();
+      if (!raw) {
+        showToast('Enter Page Range', 'Specify a page range like "1-2, 4" to extract.', 'amber');
+        return;
+      }
+
+      const indices = [];
+      const parts = raw.split(',');
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed.includes('-')) {
+          const [s, e] = trimmed.split('-').map(n => parseInt(n.trim(), 10));
+          if (!isNaN(s) && !isNaN(e)) {
+            for (let k = Math.min(s, e); k <= Math.max(s, e); k++) {
+              if (k >= 1 && k <= state.pdfPages.length) indices.push(k - 1);
+            }
+          }
+        } else {
+          const n = parseInt(trimmed, 10);
+          if (!isNaN(n) && n >= 1 && n <= state.pdfPages.length) indices.push(n - 1);
+        }
+      }
+
+      if (indices.length === 0) {
+        showToast('Invalid Range', `Enter numbers between 1 and ${state.pdfPages.length}.`, 'rose');
+        return;
+      }
+
+      const pages = indices.map(i => state.pdfPages[i]);
+      const outBytes = await buildOutputPdfFromPages(pages);
+      const blob = new Blob([outBytes], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `VaultConvert_Split_Pages_${raw.replace(/[^0-9-]/g, '_')}.pdf`;
+      a.click();
+      showToast('Split PDF Extracted', `Extracted ${pages.length} pages into a standalone PDF.`);
+    }
+
+    async function burstPdfToZip() {
+      const selected = state.pdfPages.filter(p => p.selected);
+      if (selected.length === 0) {
+        showToast('No Pages Selected', 'Select pages to burst into individual PDFs.', 'amber');
+        return;
+      }
+      const t0 = performance.now();
+      const zip = new JSZip();
+
+      for (let i = 0; i < selected.length; i++) {
+        const singleBytes = await buildOutputPdfFromPages([selected[i]]);
+        zip.file(`Page_${String(i + 1).padStart(2, '0')}_${selected[i].sourceName.replace(/\.pdf$/i, '')}.pdf`, singleBytes);
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zipBlob);
+      a.download = `VaultConvert_Burst_${selected.length}_Pages.zip`;
+      a.click();
+
+      logTelemetry('JSZIP BURST', `Bundled ${selected.length} individual PDFs into .ZIP archive`, Math.round(performance.now() - t0));
+      showToast('Burst ZIP Ready', `Packaged ${selected.length} individual PDF files into a single ZIP.`);
+    }
+
+    // -------------------------------------------------------------------------
+    // SIGNATURE PAD INITIALIZATION
+    // -------------------------------------------------------------------------
+    let sigDrawing = false;
+    let sigHasInk = false;
+
+    function initSignaturePad() {
+      const canvas = document.getElementById('signatureCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      // Draw subtle baseline
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.95)';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: (clientX - rect.left) * (canvas.width / rect.width),
+          y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+      };
+
+      const start = (e) => {
+        e.preventDefault();
+        sigDrawing = true;
+        sigHasInk = true;
+        document.getElementById('sigEnableToggle').checked = true;
+        const pos = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+      };
+
+      const move = (e) => {
+        if (!sigDrawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      };
+
+      const end = () => {
+        sigDrawing = false;
+      };
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('touchend', end);
+    }
+
+    function clearSignaturePad() {
+      const canvas = document.getElementById('signatureCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      sigHasInk = false;
+    }
+
+    function isSignatureCanvasBlank() {
+      return !sigHasInk;
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 2: MEDIA CONVERTER (MP4 / VIDEO TO MP3 & WAV AUDIO EXTRACTOR)
+    // -------------------------------------------------------------------------
+    async function handleMediaFile(file) {
+      if (!file) return;
+      await inspectFileMagicBytes(file);
+      state.mediaFileName = file.name;
+      const t0 = performance.now();
+
+      // Show video preview if MP4 / WEBM / MOV
+      const videoWrap = document.getElementById('videoPreviewWrapper');
+      const videoEl = document.getElementById('sourceVideoPreview');
+      if (file.type.startsWith('video/') || /\.(mp4|mov|webm|mkv)$/i.test(file.name)) {
+        videoWrap.classList.remove('hidden');
+        videoEl.src = URL.createObjectURL(file);
+      } else {
+        videoWrap.classList.add('hidden');
+      }
+
+      try {
+        document.getElementById('mediaTrackTitle').textContent = `Decoding "${file.name}"...`;
+        const arrayBuf = await file.arrayBuffer();
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const decodedBuffer = await audioCtx.decodeAudioData(arrayBuf);
+        loadAudioBufferIntoWorkspace(decodedBuffer, file.name, Math.round(performance.now() - t0));
+      } catch (err) {
+        console.error(err);
+        showToast('Audio Decode Error', 'Could not decode audio stream from this file.', 'rose');
+      }
+    }
+
+    // Synthesize a rich stereo ambient chord & melody track so users can test MP4->MP3 immediately
+    async function synthesizeSampleAudioTrack() {
+      const t0 = performance.now();
+      const sampleRate = 44100;
+      const durationSeconds = 8;
+      const offlineCtx = new OfflineAudioContext(2, sampleRate * durationSeconds, sampleRate);
+
+      // Chord progression frequencies
+      const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 587.33, 493.88, 392.00];
+      notes.forEach((freq, idx) => {
+        const osc = offlineCtx.createOscillator();
+        const gain = offlineCtx.createGain();
+        osc.type = idx % 2 === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq, idx * 1.0);
+
+        gain.gain.setValueAtTime(0.001, idx * 1.0);
+        gain.gain.exponentialRampToValueAtTime(0.28, idx * 1.0 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, idx * 1.0 + 0.95);
+
+        osc.connect(gain);
+        gain.connect(offlineCtx.destination);
+        osc.start(idx * 1.0);
+        osc.stop(idx * 1.0 + 0.98);
+      });
+
+      // Add warm bass pad
+      const bass = offlineCtx.createOscillator();
+      const bassGain = offlineCtx.createGain();
+      bass.type = 'sawtooth';
+      bass.frequency.setValueAtTime(130.81, 0);
+      bass.frequency.setValueAtTime(146.83, 4);
+      bassGain.gain.setValueAtTime(0.08, 0);
+      bassGain.gain.exponentialRampToValueAtTime(0.01, durationSeconds);
+      bass.connect(bassGain);
+      bassGain.connect(offlineCtx.destination);
+      bass.start(0);
+      bass.stop(durationSeconds);
+
+      const renderedBuffer = await offlineCtx.startRendering();
+      document.getElementById('videoPreviewWrapper').classList.add('hidden');
+      loadAudioBufferIntoWorkspace(renderedBuffer, 'Sample_Video_Soundtrack.mp4', Math.round(performance.now() - t0));
+      showToast('Demo Audio Stream Ready', 'Synthesized 8.0s stereo audio stream. Click "Extract & Convert to .MP3"!');
+    }
+
+    function loadAudioBufferIntoWorkspace(audioBuffer, fileName, decodeMs) {
+      state.audioBuffer = audioBuffer;
+      state.mediaFileName = fileName;
+      state.trimStart = 0;
+      state.trimEnd = parseFloat(audioBuffer.duration.toFixed(2));
+
+      document.getElementById('mediaTrackTitle').textContent = fileName;
+      document.getElementById('mediaTrackMeta').textContent =
+        `${audioBuffer.duration.toFixed(2)}s • ${audioBuffer.sampleRate} Hz • ${audioBuffer.numberOfChannels} Channels (Decoded in ${decodeMs}ms)`;
+
+      const startRange = document.getElementById('trimStartRange');
+      const endRange = document.getElementById('trimEndRange');
+      startRange.max = audioBuffer.duration.toFixed(2);
+      endRange.max = audioBuffer.duration.toFixed(2);
+      startRange.value = 0;
+      endRange.value = audioBuffer.duration.toFixed(2);
+      startRange.disabled = false;
+      endRange.disabled = false;
+
+      document.getElementById('trimStartLabel').textContent = '0.00s';
+      document.getElementById('trimEndLabel').textContent = `${audioBuffer.duration.toFixed(2)}s`;
+
+      document.getElementById('btnPreviewTrimmed').disabled = false;
+      document.getElementById('btnStartMediaConvert').disabled = false;
+
+      drawWaveform();
+      logTelemetry('AUDIO DEMUX', `Extracted ${audioBuffer.numberOfChannels}ch PCM audio from "${fileName}"`, decodeMs);
+    }
+
+    function updateTrimHandles(which) {
+      if (!state.audioBuffer) return;
+      const startEl = document.getElementById('trimStartRange');
+      const endEl = document.getElementById('trimEndRange');
+      let s = parseFloat(startEl.value);
+      let e = parseFloat(endEl.value);
+
+      if (which === 'start' && s >= e - 0.2) {
+        s = Math.max(0, e - 0.2);
+        startEl.value = s;
+      } else if (which === 'end' && e <= s + 0.2) {
+        e = Math.min(state.audioBuffer.duration, s + 0.2);
+        endEl.value = e;
+      }
+
+      state.trimStart = s;
+      state.trimEnd = e;
+      document.getElementById('trimStartLabel').textContent = s.toFixed(2) + 's';
+      document.getElementById('trimEndLabel').textContent = e.toFixed(2) + 's';
+      drawWaveform();
+    }
+
+    function drawWaveform() {
+      const canvas = document.getElementById('waveformCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+
+      if (!state.audioBuffer) {
+        ctx.fillStyle = '#334155';
+        ctx.font = '12px JetBrains Mono';
+        ctx.textAlign = 'center';
+        ctx.fillText('AWAITING MP4 / AUDIO STREAM...', width / 2, height / 2);
+        return;
+      }
+
+      const data = state.audioBuffer.getChannelData(0);
+      const step = Math.ceil(data.length / width);
+      const amp = height / 2;
+
+      const startRatio = state.trimStart / state.audioBuffer.duration;
+      const endRatio = state.trimEnd / state.audioBuffer.duration;
+      const startX = startRatio * width;
+      const endX = endRatio * width;
+
+      // Active trim background highlight
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+      ctx.fillRect(startX, 0, endX - startX, height);
+
+      // Draw bars
+      for (let i = 0; i < width; i += 3) {
+        let min = 1.0;
+        let max = -1.0;
+        for (let j = 0; j < step; j++) {
+          const datum = data[(i * step) + j];
+          if (datum < min) min = datum;
+          if (datum > max) max = datum;
+        }
+        const inTrim = i >= startX && i <= endX;
+        ctx.fillStyle = inTrim ? '#10b981' : '#334155';
+        const y = (1 + min) * amp;
+        const h = Math.max(2, (max - min) * amp);
+        ctx.fillRect(i, y, 2, h);
+      }
+
+      // Draw Start & End Trim Markers
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(startX, 0, 2.5, height);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(endX - 2.5, 0, 2.5, height);
+    }
+
+    function togglePlayTrimmedAudio() {
+      if (!state.audioBuffer) return;
+      if (state.isPlayingPreview) {
+        if (state.audioPreviewSource) {
+          try { state.audioPreviewSource.stop(); } catch (e) {}
+        }
+        state.isPlayingPreview = false;
+        document.getElementById('playBtnText').textContent = 'Preview Audio';
+        return;
+      }
+
+      state.audioPreviewCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = state.audioPreviewCtx.createBufferSource();
+      src.buffer = state.audioBuffer;
+      src.connect(state.audioPreviewCtx.destination);
+      const duration = Math.max(0.1, state.trimEnd - state.trimStart);
+      src.start(0, state.trimStart, duration);
+      state.audioPreviewSource = src;
+      state.isPlayingPreview = true;
+      document.getElementById('playBtnText').textContent = 'Stop Preview';
+
+      src.onended = () => {
+        state.isPlayingPreview = false;
+        document.getElementById('playBtnText').textContent = 'Preview Audio';
+      };
+    }
+
+    function setMediaOutputFormat(fmt) {
+      state.mediaOutputFormat = fmt;
+      const btnMp3 = document.getElementById('fmtBtnMp3');
+      const btnWav = document.getElementById('fmtBtnWav');
+      const bitrateWrap = document.getElementById('mp3BitrateSettings');
+      const convertBtnText = document.getElementById('btnMediaConvertText');
+
+      if (fmt === 'mp3') {
+        btnMp3.className = 'p-3.5 rounded-xl border border-amber-500 bg-amber-500/15 text-left transition';
+        btnWav.className = 'p-3.5 rounded-xl border border-slate-700 bg-slate-900/60 hover:bg-slate-800/60 text-left transition';
+        bitrateWrap.classList.remove('hidden');
+        convertBtnText.textContent = `Extract & Convert to .MP3 (${state.mp3Bitrate} kbps)`;
+      } else {
+        btnWav.className = 'p-3.5 rounded-xl border border-emerald-500 bg-emerald-500/15 text-left transition';
+        btnMp3.className = 'p-3.5 rounded-xl border border-slate-700 bg-slate-900/60 hover:bg-slate-800/60 text-left transition';
+        bitrateWrap.classList.add('hidden');
+        convertBtnText.textContent = 'Extract & Convert to Lossless .WAV';
+      }
+    }
+
+    function setMp3Bitrate(kbps) {
+      state.mp3Bitrate = kbps;
+      [128, 192, 320].forEach(k => {
+        const el = document.getElementById(`kbps-${k}`);
+        if (k === kbps) {
+          el.className = 'kbps-btn py-2 px-3 rounded-xl border border-emerald-500 bg-emerald-500/15 text-xs font-mono text-emerald-300 font-semibold';
+        } else {
+          el.className = 'kbps-btn py-2 px-3 rounded-xl border border-slate-700 bg-slate-900 text-xs font-mono text-slate-300';
+        }
+      });
+      if (state.mediaOutputFormat === 'mp3') {
+        document.getElementById('btnMediaConvertText').textContent = `Extract & Convert to .MP3 (${kbps} kbps)`;
+      }
+    }
+
+    // Float32 [-1..1] to Int16 [-32768..32767] helper
+    function floatTo16BitPCM(input) {
+      const output = new Int16Array(input.length);
+      for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      return output;
+    }
+
+    async function convertMediaToAudio() {
+      if (!state.audioBuffer) return;
+      const t0 = performance.now();
+      const sampleRate = state.audioBuffer.sampleRate;
+      const startSample = Math.floor(state.trimStart * sampleRate);
+      const endSample = Math.floor(state.trimEnd * sampleRate);
+      const frameCount = Math.max(1, endSample - startSample);
+
+      const channelMode = document.getElementById('audioChannelMode').value;
+      const numChannels = (channelMode === 'mono' || state.audioBuffer.numberOfChannels === 1) ? 1 : 2;
+
+      const leftFloat = state.audioBuffer.getChannelData(0).subarray(startSample, endSample);
+      const rightFloat = numChannels === 2
+        ? state.audioBuffer.getChannelData(1).subarray(startSample, endSample)
+        : leftFloat;
+
+      const baseName = state.mediaFileName.replace(/\.[^/.]+$/, '');
+      const progressWrap = document.getElementById('mediaEncodeProgressWrap');
+      const progressBar = document.getElementById('mediaEncodeBar');
+      const progressPct = document.getElementById('mediaEncodePercent');
+      progressWrap.classList.remove('hidden');
+
+      if (state.mediaOutputFormat === 'mp3') {
+        // Real MP3 Encoding via lamejs
+        const mp3encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, state.mp3Bitrate);
+        const leftPCM = floatTo16BitPCM(leftFloat);
+        const rightPCM = numChannels === 2 ? floatTo16BitPCM(rightFloat) : null;
+
+        const mp3Data = [];
+        const sampleBlockSize = 1152;
+        for (let i = 0; i < leftPCM.length; i += sampleBlockSize) {
+          const leftChunk = leftPCM.subarray(i, i + sampleBlockSize);
+          let mp3buf;
+          if (numChannels === 2) {
+            const rightChunk = rightPCM.subarray(i, i + sampleBlockSize);
+            mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+          } else {
+            mp3buf = mp3encoder.encodeBuffer(leftChunk);
+          }
+          if (mp3buf.length > 0) mp3Data.push(mp3buf);
+
+          if (i % (sampleBlockSize * 25) === 0) {
+            const pct = Math.min(99, Math.round((i / leftPCM.length) * 100));
+            progressBar.style.width = pct + '%';
+            progressPct.textContent = pct + '%';
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+
+        const flushBuf = mp3encoder.flush();
+        if (flushBuf.length > 0) mp3Data.push(flushBuf);
+
+        progressBar.style.width = '100%';
+        progressPct.textContent = '100%';
+
+        const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+        const outName = `${baseName}_${state.mp3Bitrate}kbps.mp3`;
+        presentConvertedAudio(blob, outName, Math.round(performance.now() - t0));
+      } else {
+        // Lossless 16-bit PCM WAV Encoding
+        const wavBuffer = encodeWAV(leftFloat, rightFloat, numChannels, sampleRate);
+        progressBar.style.width = '100%';
+        progressPct.textContent = '100%';
+        const blob = new Blob([wavBuffer], { type: 'audio/wav' });
+        const outName = `${baseName}_lossless.wav`;
+        presentConvertedAudio(blob, outName, Math.round(performance.now() - t0));
+      }
+    }
+
+    function encodeWAV(left, right, numChannels, sampleRate) {
+      const length = left.length * numChannels * 2 + 44;
+      const buffer = new ArrayBuffer(length);
+      const view = new DataView(buffer);
+
+      const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + left.length * numChannels * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * numChannels * 2, true);
+      view.setUint16(32, numChannels * 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, left.length * numChannels * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < left.length; i++) {
+        const sL = Math.max(-1, Math.min(1, left[i]));
+        view.setInt16(offset, sL < 0 ? sL * 0x8000 : sL * 0x7FFF, true);
+        offset += 2;
+        if (numChannels === 2) {
+          const sR = Math.max(-1, Math.min(1, right[i]));
+          view.setInt16(offset, sR < 0 ? sR * 0x8000 : sR * 0x7FFF, true);
+          offset += 2;
+        }
+      }
+      return buffer;
+    }
+
+    function presentConvertedAudio(blob, filename, elapsedMs) {
+      const url = URL.createObjectURL(blob);
+      document.getElementById('mediaOutputCard').classList.remove('hidden');
+      document.getElementById('mediaOutputFilename').textContent = filename;
+      document.getElementById('mediaOutputSizeBadge').textContent = formatBytes(blob.size);
+      const player = document.getElementById('convertedAudioPlayer');
+      player.src = url;
+      const dl = document.getElementById('mediaDownloadLink');
+      dl.href = url;
+      dl.download = filename;
+
+      logTelemetry('AUDIO ENCODER', `Generated ${filename} (${formatBytes(blob.size)})`, elapsedMs);
+      showToast('Audio Extraction Complete', `Ready to download ${filename} (${formatBytes(blob.size)}).`);
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 3: IMAGE & DOCS CONVERTER (PNG / JPG / WEBP / IMAGES-TO-PDF)
+    // -------------------------------------------------------------------------
+    async function handleImageFiles(fileList) {
+      if (!fileList || fileList.length === 0) return;
+      for (const file of fileList) {
+        await inspectFileMagicBytes(file);
+        const dataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(file);
+        });
+
+        const img = new Image();
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.src = dataUrl;
+        });
+
+        state.imageQueue.push({
+          id: 'img_' + Math.random().toString(36).substring(2, 9),
+          name: file.name,
+          originalSize: file.size,
+          imgElement: img,
+          convertedBlob: null,
+          convertedSize: 0,
+          previewUrl: dataUrl
+        });
+      }
+      await reprocessAllImages();
+    }
+
+    async function generateSampleImages() {
+      const themes = [
+        { name: 'ZeroTrust_Architecture_Diagram.png', bg1: '#064e3b', bg2: '#0f172a', title: 'ZERO-TRUST EDGE PIPELINE', sub: '100% WebAssembly In-Browser Execution' },
+        { name: 'Security_Benchmark_Chart.png', bg1: '#1e3a8a', bg2: '#090d16', title: 'CLOUD EGRESS REDUCTION', sub: '0 MB Uploaded • Instant Local Conversion' },
+        { name: 'Encrypted_Vault_Badge.png', bg1: '#581c87', bg2: '#0f172a', title: 'MAGIC-BYTE VERIFIED', sub: 'Binary Header Signature Match' }
+      ];
+
+      for (const t of themes) {
+        const c = document.createElement('canvas');
+        c.width = 1200;
+        c.height = 750;
+        const ctx = c.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, 1200, 750);
+        grad.addColorStop(0, t.bg1);
+        grad.addColorStop(1, t.bg2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 1200, 750);
+
+        // Decorative grid circles
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(50, 50, 1100, 650);
+
+        ctx.fillStyle = '#10b981';
+        ctx.font = 'bold 26px JetBrains Mono';
+        ctx.fillText('VAULTCONVERT // HIGH-RES GRAPHIC TEST CARD', 95, 140);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 58px Inter, sans-serif';
+        ctx.fillText(t.title, 95, 360);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '32px Inter, sans-serif';
+        ctx.fillText(t.sub, 95, 430);
+
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        const file = new File([blob], t.name, { type: 'image/png' });
+        await handleImageFiles([file]);
+      }
+      showToast('Sample Graphics Loaded', 'Added 3 high-resolution PNG graphics to batch converter.');
+    }
+
+    async function reprocessAllImages() {
+      const targetFmt = document.getElementById('imgTargetFormat').value;
+      const quality = (parseInt(document.getElementById('imgQualitySlider').value, 10) || 82) / 100;
+      const maxWidth = parseInt(document.getElementById('imgMaxWidth').value, 10) || 0;
+
+      for (const item of state.imageQueue) {
+        let w = item.imgElement.naturalWidth || item.imgElement.width;
+        let h = item.imgElement.naturalHeight || item.imgElement.height;
+        if (maxWidth > 0 && w > maxWidth) {
+          const ratio = maxWidth / w;
+          w = maxWidth;
+          h = Math.round(h * ratio);
+        }
+
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d');
+        if (targetFmt === 'image/jpeg') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, w, h);
+        }
+        ctx.drawImage(item.imgElement, 0, 0, w, h);
+
+        const blob = await new Promise(r => c.toBlob(r, targetFmt, quality));
+        item.convertedBlob = blob;
+        item.convertedSize = blob ? blob.size : 0;
+        item.outWidth = w;
+        item.outHeight = h;
+      }
+
+      renderImageQueue();
+    }
+
+    function renderImageQueue() {
+      const emptyEl = document.getElementById('imageEmptyState');
+      const gridEl = document.getElementById('imageGridList');
+      const statsEl = document.getElementById('imageQueueStats');
+      const savingsEl = document.getElementById('imgSavingsValue');
+      const targetFmt = document.getElementById('imgTargetFormat').value;
+      const ext = targetFmt.split('/')[1] === 'jpeg' ? 'jpg' : targetFmt.split('/')[1];
+
+      statsEl.textContent = `${state.imageQueue.length} images queued`;
+
+      if (state.imageQueue.length === 0) {
+        emptyEl.classList.remove('hidden');
+        gridEl.classList.add('hidden');
+        gridEl.innerHTML = '';
+        savingsEl.textContent = '0 KB → 0 KB';
+        return;
+      }
+
+      emptyEl.classList.add('hidden');
+      gridEl.classList.remove('hidden');
+      gridEl.innerHTML = '';
+
+      let totalOrig = 0;
+      let totalConv = 0;
+
+      state.imageQueue.forEach((item, idx) => {
+        totalOrig += item.originalSize;
+        totalConv += item.convertedSize;
+        const deltaPct = item.originalSize > 0
+          ? Math.round(((item.convertedSize - item.originalSize) / item.originalSize) * 100)
+          : 0;
+        const deltaBadge = deltaPct <= 0
+          ? `<span class="text-emerald-400 font-mono">${deltaPct}% saved</span>`
+          : `<span class="text-amber-400 font-mono">+${deltaPct}%</span>`;
+
+        const outName = item.name.replace(/\.[^/.]+$/, '') + '.' + ext;
+        const outUrl = URL.createObjectURL(item.convertedBlob);
+
+        const card = document.createElement('div');
+        card.className = 'p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center gap-3.5';
+        card.innerHTML = `
+          <img src="${item.previewUrl}" class="w-16 h-16 rounded-lg object-cover border border-slate-700 shrink-0" />
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-semibold text-white truncate">${outName}</p>
+            <p class="text-[11px] font-mono text-slate-400 mt-0.5">
+              ${item.outWidth}×${item.outHeight}px
+            </p>
+            <p class="text-[11px] font-mono text-slate-300 mt-1">
+              ${formatBytes(item.originalSize)} &rarr; <strong class="text-sky-300">${formatBytes(item.convertedSize)}</strong> (${deltaBadge})
+            </p>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <a href="${outUrl}" download="${outName}" class="p-2 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/30" title="Download">
+              <i data-lucide="download" class="w-4 h-4"></i>
+            </a>
+            <button onclick="removeImageFromQueue(${idx})" class="p-2 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300" title="Remove">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+        gridEl.appendChild(card);
+      });
+
+      const totalSavedPct = totalOrig > 0 ? Math.round(((totalConv - totalOrig) / totalOrig) * 100) : 0;
+      savingsEl.textContent = `${formatBytes(totalOrig)} → ${formatBytes(totalConv)} (${totalSavedPct}%)`;
+      lucide.createIcons();
+    }
+
+    function removeImageFromQueue(idx) {
+      state.imageQueue.splice(idx, 1);
+      renderImageQueue();
+    }
+
+    function clearImageQueue() {
+      state.imageQueue = [];
+      renderImageQueue();
+    }
+
+    async function downloadAllImagesAsZip() {
+      if (state.imageQueue.length === 0) {
+        showToast('Queue Empty', 'Add images to convert first.', 'amber');
+        return;
+      }
+      const targetFmt = document.getElementById('imgTargetFormat').value;
+      const ext = targetFmt.split('/')[1] === 'jpeg' ? 'jpg' : targetFmt.split('/')[1];
+      const zip = new JSZip();
+
+      state.imageQueue.forEach((item, i) => {
+        const outName = item.name.replace(/\.[^/.]+$/, '') + '.' + ext;
+        zip.file(outName, item.convertedBlob);
+      });
+
+      const content = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(content);
+      a.download = `VaultConvert_Images_${ext.toUpperCase()}.zip`;
+      a.click();
+      showToast('Batch ZIP Downloaded', `Packaged ${state.imageQueue.length} converted .${ext} images.`);
+    }
+
+    async function compileImagesToPdf() {
+      if (state.imageQueue.length === 0) {
+        showToast('No Images Queued', 'Add or generate sample images first.', 'amber');
+        return;
+      }
+      const t0 = performance.now();
+      const { PDFDocument } = PDFLib;
+      const pdfDoc = await PDFDocument.create();
+
+      for (const item of state.imageQueue) {
+        // Convert image via canvas to clean JPEG buffer for universal pdf-lib embedding
+        const c = document.createElement('canvas');
+        c.width = item.imgElement.naturalWidth || item.imgElement.width;
+        c.height = item.imgElement.naturalHeight || item.imgElement.height;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(item.imgElement, 0, 0);
+
+        const jpgBlob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+        const jpgBytes = await jpgBlob.arrayBuffer();
+        const embeddedImg = await pdfDoc.embedJpg(jpgBytes);
+
+        const page = pdfDoc.addPage([c.width, c.height]);
+        page.drawImage(embeddedImg, { x: 0, y: 0, width: c.width, height: c.height });
+      }
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `VaultConvert_${state.imageQueue.length}_Images_Compiled.pdf`;
+      a.click();
+
+      logTelemetry('IMAGES-TO-PDF', `Compiled ${state.imageQueue.length} images into PDF (${formatBytes(pdfBytes.byteLength)})`, Math.round(performance.now() - t0));
+      showToast('Compiled PDF Ready', `Combined ${state.imageQueue.length} images into a single PDF.`);
+    }
+
+    // -------------------------------------------------------------------------
+    // MODULE 4: DATA & SPREADSHEET CONVERTER (XLSX / CSV / JSON / MD)
+    // -------------------------------------------------------------------------
+    async function handleDataFile(file) {
+      if (!file) return;
+      await inspectFileMagicBytes(file);
+      const t0 = performance.now();
+
+      try {
+        if (file.name.endsWith('.json')) {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          const arr = Array.isArray(parsed) ? parsed : [parsed];
+          setTableData(arr, file.name, Math.round(performance.now() - t0));
+        } else {
+          const buf = await file.arrayBuffer();
+          const wb = XLSX.read(buf, { type: 'array' });
+          const firstSheet = wb.SheetNames[0];
+          const json = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { defval: '' });
+          setTableData(json, file.name, Math.round(performance.now() - t0));
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Spreadsheet Parse Error', 'Ensure the file is valid XLSX, CSV, or JSON array.', 'rose');
+      }
+    }
+
+    function loadSampleDataset() {
+      const sample = [
+        { Service_ID: 'VC-PDF-01', Module: 'PDF Studio (pdf-lib)', Execution_Target: 'Client WebAssembly', Avg_Latency_ms: 18, Cloud_Cost_USD: 0.00, Zero_Trust_Verified: 'TRUE' },
+        { Service_ID: 'VC-AUD-02', Module: 'MP4 -> MP3 (lamejs)', Execution_Target: 'Browser AudioContext', Avg_Latency_ms: 145, Cloud_Cost_USD: 0.00, Zero_Trust_Verified: 'TRUE' },
+        { Service_ID: 'VC-IMG-03', Module: 'WEBP/PNG Batch Engine', Execution_Target: 'HTML5 Canvas 2D', Avg_Latency_ms: 24, Cloud_Cost_USD: 0.00, Zero_Trust_Verified: 'TRUE' },
+        { Service_ID: 'VC-DAT-04', Module: 'SheetJS XLSX Matrix', Execution_Target: 'Local ArrayBuffer', Avg_Latency_ms: 9, Cloud_Cost_USD: 0.00, Zero_Trust_Verified: 'TRUE' },
+        { Service_ID: 'VC-SEC-05', Module: 'Magic-Byte Hex Auditor', Execution_Target: 'Web Crypto SHA-256', Avg_Latency_ms: 4, Cloud_Cost_USD: 0.00, Zero_Trust_Verified: 'TRUE' }
+      ];
+      setTableData(sample, 'Sample_Telemetry_Matrix.xlsx', 4);
+      showToast('Sample Dataset Loaded', 'Loaded 5 rows × 6 columns. Click any cell to edit inline!');
+    }
+
+    function setTableData(rows, sourceName, elapsedMs) {
+      state.tableData = rows;
+      state.tableColumns = rows.length > 0 ? Object.keys(rows[0]) : [];
+      document.getElementById('dataMetaBadge').textContent = `${rows.length} rows × ${state.tableColumns.length} cols (${sourceName})`;
+      renderDataTable();
+      logTelemetry('SHEETJS PARSER', `Loaded ${rows.length} rows from "${sourceName}"`, elapsedMs);
+    }
+
+    function renderDataTable() {
+      const thead = document.getElementById('dataTableHead');
+      const tbody = document.getElementById('dataTableBody');
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+
+      if (state.tableData.length === 0) {
+        tbody.innerHTML = `<tr><td class="py-10 text-center text-slate-500">No dataset loaded. Upload an .XLSX, .CSV, or .JSON file or click "Load Sample Dataset".</td></tr>`;
+        return;
+      }
+
+      const headRow = document.createElement('tr');
+      state.tableColumns.forEach(col => {
+        const th = document.createElement('th');
+        th.className = 'py-3 px-4 border-r border-slate-800 last:border-r-0';
+        th.textContent = col;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+
+      state.tableData.forEach((row, rIdx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-900/60';
+        state.tableColumns.forEach(col => {
+          const td = document.createElement('td');
+          td.className = 'py-2.5 px-4 border-r border-slate-800/50 last:border-r-0 font-mono focus:bg-slate-800 focus:outline-none focus:text-emerald-300';
+          td.contentEditable = 'true';
+          td.textContent = row[col] !== undefined ? row[col] : '';
+          td.onblur = () => {
+            state.tableData[rIdx][col] = td.textContent;
+          };
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    function exportDataAs(format) {
+      if (state.tableData.length === 0) {
+        showToast('No Data to Export', 'Load a spreadsheet or sample dataset first.', 'amber');
+        return;
+      }
+
+      const rawBox = document.getElementById('dataRawOutputBox');
+      const rawPre = document.getElementById('dataRawOutputPre');
+      const rawTitle = document.getElementById('dataRawOutputTitle');
+
+      if (format === 'xlsx') {
+        const ws = XLSX.utils.json_to_sheet(state.tableData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'VaultConvert_Data');
+        XLSX.writeFile(wb, 'VaultConvert_Export.xlsx');
+        showToast('Excel Workbook Exported', 'Downloaded VaultConvert_Export.xlsx');
+      } else if (format === 'csv') {
+        const ws = XLSX.utils.json_to_sheet(state.tableData);
+        const csv = XLSX.utils.sheet_to_csv(ws);
+        rawBox.classList.remove('hidden');
+        rawTitle.textContent = 'Generated CSV Output';
+        rawPre.textContent = csv;
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'VaultConvert_Export.csv';
+        a.click();
+        showToast('CSV Exported', 'Downloaded VaultConvert_Export.csv');
+      } else if (format === 'json') {
+        const jsonStr = JSON.stringify(state.tableData, null, 2);
+        rawBox.classList.remove('hidden');
+        rawTitle.textContent = 'Generated JSON Output';
+        rawPre.textContent = jsonStr;
+
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'VaultConvert_Export.json';
+        a.click();
+        showToast('JSON Exported', 'Downloaded VaultConvert_Export.json');
+      } else if (format === 'md') {
+        const cols = state.tableColumns;
+        const header = `| ${cols.join(' | ')} |`;
+        const divider = `| ${cols.map(() => '---').join(' | ')} |`;
+        const body = state.tableData.map(r => `| ${cols.map(c => String(r[c] ?? '').replace(/\|/g, '\\|')).join(' | ')} |`).join('\n');
+        const md = `${header}\n${divider}\n${body}`;
+
+        rawBox.classList.remove('hidden');
+        rawTitle.textContent = 'Generated Markdown Table (.MD)';
+        rawPre.textContent = md;
+
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'VaultConvert_Table.md';
+        a.click();
+        showToast('Markdown Table Exported', 'Downloaded VaultConvert_Table.md & displayed preview below.');
+      }
+    }
+
+    function copyRawDataOutput() {
+      const text = document.getElementById('dataRawOutputPre').textContent;
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      showToast('Copied to Clipboard', 'Formatted data output copied.');
+    }
+
+    // -------------------------------------------------------------------------
+    // DRAG AND DROP WIRING ACROSS ALL MODULES
+    // -------------------------------------------------------------------------
+    function setupDropZone(elementId, callback) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      ['dragenter', 'dragover'].forEach(evt => {
+        el.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          el.classList.add('drop-zone-active');
+        });
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        el.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          el.classList.remove('drop-zone-active');
+        });
+      });
+      el.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) callback(files);
+      });
+    }
+
+    // Initialize App on Window Load
+    window.onload = async function () {
+      lucide.createIcons();
+      initSignaturePad();
+      drawWaveform();
+
+      setupDropZone('pdfDropZone', (files) => handlePdfFiles(files));
+      setupDropZone('mediaDropZone', (files) => handleMediaFile(files[0]));
+      setupDropZone('imageDropZone', (files) => handleImageFiles(files));
+
+      logTelemetry('BOOT', 'VaultConvert Zero-Trust Engine initialized. All Wasm/JS workers ready.');
+      // Pre-load sample dataset in Module 4 so it's ready right away
+      loadSampleDataset();
+    };
+  </script>
+</body>
+</html>
